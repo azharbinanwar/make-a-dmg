@@ -37,10 +37,10 @@ curl -fsSLO https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/main/make
 chmod +x make-a-dmg
 ```
 
-Or run it from the web with nothing saved to disk:
+Or run it straight from the web, nothing saved to disk. It uses the `.app` in the folder you run it from, or opens a picker if there is none:
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/main/make-a-dmg) /path/to/YourApp.app
+bash <(curl -fsSL https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/main/make-a-dmg)
 ```
 
 ---
