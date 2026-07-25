@@ -332,22 +332,31 @@ tell application "Finder"
   end tell
 end tell
 EOF
-# run the AppleScript, then verify Finder actually saved the layout (.DS_Store,
-# which must be a real, sizeable file, not an empty stub). Retry once if it didn't.
+# One layout attempt. Force-clean the old .DS_Store first, so the success check
+# can only pass on a fresh layout written by THIS attempt — a stale one left by a
+# previous try would otherwise fool it into "succeeding" with the wrong window.
+# Then wait for Finder to actually write the fresh, sizeable .DS_Store.
 run_layout(){
+  rm -f "$MOUNT/.DS_Store" 2>/dev/null || true
+  sync
   ( osascript "$SCPT" >/dev/null 2>&1 ) & local op=$!
   ( sleep 30; kill -9 "$op" >/dev/null 2>&1 ) & local wd=$!
   disown "$wd" 2>/dev/null || true
   wait "$op" 2>/dev/null; kill "$wd" >/dev/null 2>&1 || true
-  local i; for i in 1 2 3 4 5 6 7 8 9 10; do
-    [ -f "$MOUNT/.DS_Store" ] && [ "$(stat -f%z "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" -ge 4096 ] && break
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+    [ "$(stat -f%z "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" -ge 4096 ] && { sync; return 0; }
     sleep 0.5
   done
   sync
-  [ -f "$MOUNT/.DS_Store" ] && [ "$(stat -f%z "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" -ge 4096 ]
+  [ "$(stat -f%z "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" -ge 4096 ]
 }
+# Make sure Finder is up and ready before scripting it. A cold or just-launched
+# Finder ignores the very first attempt, which is why the first build could fail.
+osascript -e 'tell application "Finder" to launch' >/dev/null 2>&1 || true
+sleep 1
 styled=false
-for _a in 1 2 3 4; do
+for _a in 1 2 3 4 5; do
   run_layout && { styled=true; break; }
   osascript -e 'tell application "Finder" to close every Finder window' >/dev/null 2>&1 || true
   sleep 1
