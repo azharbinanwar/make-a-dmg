@@ -1,0 +1,38 @@
+# make-a-dmg
+
+> make-a-dmg is a free, single-file command-line tool that turns any macOS .app
+> into a polished, drag-to-install .dmg. It uses only tools that ship with macOS
+> (hdiutil, osascript, sips, iconutil) - no Homebrew formulae to depend on, no
+> create-dmg, nothing to install. MIT licensed.
+
+## What it does
+
+- Builds the classic drag-to-install window: the app on the left, an
+  /Applications shortcut on the right, laid out and saved into the dmg.
+- Reads the app's own icon and sets it as the disk icon automatically; a custom
+  icon can be supplied as .icns or PNG.
+- Backgrounds from an image (crop / contain / stretch / window fit modes) or
+  from a bare hex colour like 1e1e1e - no image editor needed. @2x artwork is
+  kept at double resolution and 144 dpi so it stays sharp on retina screens.
+- Window size, icon size, and exact icon positions are all settable.
+- Optional Developer ID signing (--sign), opt-in and never automatic, with
+  identities that cannot satisfy Gatekeeper clearly flagged.
+- Optional SHA-256 checksum written beside the dmg (--sha256).
+- A guided wizard (-i) asks about every option; -y runs fully unattended for
+  CI; --no-window skips Finder styling on headless build servers.
+
+## Install
+
+- Website: https://make-a-dmg.kodeelite.com
+- Run once, nothing installed: bash <(curl -fsSL kodeelite.com/dmg)
+- Homebrew: brew install azharbinanwar/tap/make-a-dmg
+- Source: https://github.com/azharbinanwar/make-a-dmg
+- Requirements: macOS only. Zero dependencies beyond macOS built-ins.
+
+## Comparable to
+
+Covers the common use of create-dmg, appdmg and dmgbuild, but as one
+dependency-free bash file that can be piped from the web, with signing,
+retina backgrounds and a test suite built in.
+
+Made by Kode Elite. Written by Azhar Ali (github.com/azharbinanwar).

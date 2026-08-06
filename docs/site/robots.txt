@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://make-a-dmg.kodeelite.com/sitemap.xml

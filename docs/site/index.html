@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>make-a-dmg — one command, a finished .dmg</title>
+<meta name="description" content="Turn any macOS app into a polished, drag-to-install .dmg with one command. Zero dependencies — just the tools already on your Mac.">
+
+<link rel="canonical" href="https://make-a-dmg.kodeelite.com/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="make-a-dmg — one command, a finished .dmg">
+<meta property="og:description" content="Turn any macOS app into a polished, drag-to-install .dmg with one command. Zero dependencies.">
+<meta property="og:url" content="https://make-a-dmg.kodeelite.com">
+<meta property="og:image" content="https://make-a-dmg.kodeelite.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="make-a-dmg — one command, a finished .dmg">
+<meta name="twitter:description" content="Turn any macOS app into a polished, drag-to-install .dmg with one command. Zero dependencies.">
+<meta name="twitter:image" content="https://make-a-dmg.kodeelite.com/og.png">
+<link rel="apple-touch-icon" href="icon.png">
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@1&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   make-a-dmg — cinematic single file. No frameworks, no fonts,
+   no requests except one version ping to the GitHub API.
+   The hero is a terminal replaying the tool's real output,
+   because the product IS a command that leaves a .dmg behind.
+   ============================================================ */
+:root{
+  --lime:#C6F53F; --lime-hover:#D6FF5C; --on-lime:#0A0A0A;
+  --bg:#FFFFFF; --bg-alt:#F6F6F2;
+  --fg:#0A0A0A; --dim:#52525B; --faint:#71717A;
+  --accent:#4D6B00; --accent2:#3E5600; --ok:#15803D;
+  --line:rgba(0,0,0,.10); --line-2:rgba(0,0,0,.14);
+  --grid-line:rgba(0,0,0,.045); --grain-opacity:.025;
+  --glow-1:rgba(198,245,63,.30); --glow-2:rgba(124,58,237,.06);
+  --net-node:rgba(0,0,0,.35); --net-hot:#6C8F00;
+  --glass:rgba(255,255,255,.66); --glass-2:rgba(255,255,255,.58);
+  --panel:var(--bg-alt); --panel-line:var(--line);
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --sans:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --serif:"Instrument Serif",Georgia,serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#050505; --bg-alt:#080808;
+  --fg:#FFFFFF; --dim:#A1A1AA; --faint:#71717A;
+  --accent:#C6F53F; --accent2:#D3F955; --ok:#4ADE80;
+  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.10);
+  --grid-line:rgba(255,255,255,.034); --grain-opacity:.045;
+  --glow-1:rgba(198,245,63,.10); --glow-2:rgba(124,58,237,.07);
+  --net-node:rgba(255,255,255,.45); --net-hot:#D3F955;
+  --glass:rgba(17,17,17,.72); --glass-2:rgba(13,13,13,.64);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);
+     -webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono)}
+.wrap{max-width:960px;margin:0 auto;padding:0 22px;position:relative}
+
+/* ---------- aurora + grain ---------- */
+.gridbg{position:fixed;inset:0;z-index:-3;pointer-events:none;
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:72px 72px}
+.sky{position:fixed;inset:-20%;z-index:-2;filter:blur(90px);pointer-events:none}
+.sky i{position:absolute;border-radius:50%}
+.sky .a{width:48vw;height:48vw;left:0;top:-8%;background:var(--glow-1);animation:drift1 26s ease-in-out infinite alternate}
+.sky .b{width:40vw;height:40vw;right:-6%;top:16%;background:var(--glow-2);animation:drift2 31s ease-in-out infinite alternate}
+.sky .c{width:26vw;height:26vw;left:36%;top:48%;background:var(--glow-1);opacity:.5;animation:drift3 24s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(9vw,7vh) scale(1.15)}}
+@keyframes drift2{to{transform:translate(-7vw,10vh) scale(.9)}}
+@keyframes drift3{to{transform:translate(6vw,-8vh) scale(1.2)}}
+.net{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--grain-opacity);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")}
+
+/* ---------- entrance ---------- */
+.up{opacity:0;transform:translateY(18px);animation:up .8s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes up{to{opacity:1;transform:none}}
+.d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.25s}.d4{animation-delay:.4s}.d5{animation-delay:.6s}
+
+/* ---------- hero ---------- */
+header{padding:42px 0 0;text-align:center}
+.pill{display:inline-flex;gap:8px;align-items:center;font:12.5px var(--mono);color:var(--dim);
+  border:1px solid var(--panel-line);background:var(--panel);border-radius:99px;padding:6px 14px}
+.pill b{color:var(--accent);font-weight:600}
+h1{margin:16px 0 0;font:600 clamp(36px,7vw,62px)/1.04 var(--sans);letter-spacing:-.035em}
+h1 em{font:italic 400 1.04em var(--serif);color:var(--accent);letter-spacing:0}
+.tag{margin:12px auto 0;max-width:46ch;font-size:17.5px;color:var(--dim)}
+
+.install{margin-top:34px;max-width:860px;margin-left:auto;margin-right:auto}
+.paths{display:grid;grid-template-columns:1fr;gap:14px;max-width:620px;margin:18px auto 0;text-align:left}
+.path{border:1px solid var(--line-2);border-radius:20px;padding:17px 18px 19px;min-width:0;
+  background:var(--glass);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);
+  box-shadow:0 8px 32px rgba(0,0,0,.10)}
+.path .eyebrow{display:inline-block;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--on-lime);background:var(--lime);border-radius:999px;padding:4px 11px}
+.path h3{margin:12px 0 6px;font:600 19px var(--sans);letter-spacing:-.02em}
+.path p{margin:0 0 12px;font-size:14px;color:var(--dim);line-height:1.55}
+.path code{font-size:13px;background:var(--bg-alt);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.path .cmdbar{max-width:none}
+.overview{max-width:860px;margin:56px auto 0;text-align:center}
+.sec-h{margin:0;font:600 clamp(22px,3.6vw,30px)/1.2 var(--sans);letter-spacing:-.025em}
+.sec-p{margin:12px auto 0;font-size:15.5px;color:var(--dim);max-width:56ch}
+.sec-p2{margin:22px auto 0;font-size:14.5px;color:var(--dim);max-width:56ch}
+.sec-p2 code{font-size:13px;background:var(--bg-alt);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.ogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:20px;
+  background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;
+  backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
+  box-shadow:0 8px 32px rgba(0,0,0,.08)}
+.ogrid > div{background:var(--glass-2);padding:13px 16px}
+.ogrid b{display:block;font:600 12.5px var(--mono);letter-spacing:.04em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:4px}
+.ogrid span{font-size:13.5px;color:var(--dim);line-height:1.55}
+.ogrid code{font-size:12px;background:var(--bg-alt);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+@media (max-width:860px){.ogrid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.ogrid{grid-template-columns:1fr}}
+.try{margin:0;text-align:center;font-size:16px;color:var(--fg);font-weight:600}
+.tag b{color:var(--fg);font-weight:600}
+.meta{margin:18px 0 0;text-align:center;font:12.5px var(--mono);color:var(--faint)}
+.cmdbar{display:flex;max-width:560px;margin:0 auto;border-radius:12px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.09);background:#0A0E14;
+  box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.cmdbar code{flex:1;min-width:0;padding:16px 18px;font:15px/1.5 var(--mono);text-align:left;
+  overflow-x:auto;white-space:pre;color:#dbe6f5}
+.cmdbar code .p{color:var(--accent)}
+.cmdbar button{flex:none;width:86px;border:0;border-left:1px solid rgba(255,255,255,.09);cursor:pointer;
+  background:var(--lime);color:var(--on-lime);font:600 13px var(--sans)}
+.cmdbar button:hover{background:var(--lime-hover)}
+.cmdbar button.done{background:var(--ok);color:#fff}
+.alt{margin:10px 0 0;text-align:center;font-size:13.5px;color:var(--dim)}
+.alt code{color:var(--fg);background:var(--bg-alt);border:1px solid var(--line);
+  border-radius:6px;padding:2px 8px;cursor:pointer}
+.alt code:hover{border-color:var(--accent)}
+
+/* ---------- the floating terminal ---------- */
+.stagewrap{perspective:1500px;margin:30px auto 0;max-width:720px}
+.bob{animation:bob 8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+#tilt{transform-style:preserve-3d;transition:transform .12s linear}
+.term{border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.13);
+  background:#0a0e14;box-shadow:0 40px 90px rgba(0,0,0,.6),0 6px 22px rgba(0,0,0,.4);
+  text-align:left}
+.tbar{height:34px;background:linear-gradient(#3b4048,#2b3037);display:flex;align-items:center;
+  gap:7px;padding:0 12px;position:relative}
+.tbar i{width:12px;height:12px;border-radius:50%}
+.tbar .r{background:#ff5f57}.tbar .y{background:#febc2e}.tbar .g{background:#28c840}
+.tbar b{position:absolute;left:0;right:0;text-align:center;font:500 12.5px var(--mono);color:#aab3bf}
+.tbody{padding:18px 20px 24px;font:13.5px/1.75 var(--mono);min-height:505px;white-space:pre-wrap;
+  overflow-x:auto}
+.tbody .in{color:#e6edf3}
+.tbody .pr{color:#3fd47f}
+.tbody .cy{color:#59c2ff}.tbody .gn{color:#3fd47f}.tbody .dm{color:#6a7686}.tbody .bd{font-weight:700}
+.cursor{display:inline-block;width:8px;height:16px;vertical-align:-3px;background:#e6edf3;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.scen-title{margin:0 0 14px;text-align:center;font:600 15.5px var(--sans);color:var(--fg)}
+.scen-title::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--lime);border:1px solid rgba(0,0,0,.12);margin-right:9px;margin-left:-19px;vertical-align:1px}
+.tnav{display:flex;align-items:center;justify-content:center;gap:16px;padding:14px 0 0}
+.tnav button{background:none;border:1px solid var(--panel-line);color:var(--dim);
+  width:30px;height:30px;border-radius:8px;font:16px/1 var(--sans);cursor:pointer;padding:0}
+.tnav button:hover{color:var(--fg);border-color:var(--accent)}
+.dots{display:flex;gap:8px}
+.dots i{width:7px;height:7px;border-radius:50%;cursor:pointer;transition:background .2s,transform .2s}
+.dots i:hover{background:var(--faint)}
+.dots i.on{background:var(--accent);transform:scale(1.25)}
+.dots i{background:var(--line-2)}
+.stagecap{margin-top:14px;text-align:center;font-size:13.5px;color:var(--dim)}
+
+/* ---------- the result: the dmg your users open ---------- */
+.stagewrap{position:relative}
+.result{position:absolute;right:-26px;bottom:-34px;width:46%;max-width:330px;z-index:2;
+  transform:scale(.55) translateY(30px);opacity:0;pointer-events:none;
+  transition:transform .55s cubic-bezier(.2,1.4,.3,1),opacity .35s ease;
+  filter:drop-shadow(0 24px 50px rgba(0,0,0,.55))}
+.result.show{transform:none;opacity:1}
+.rwin{border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.18);background:#fff}
+.rbar{height:24px;background:linear-gradient(#3b4048,#2b3037);display:flex;align-items:center;
+  gap:5px;padding:0 9px;position:relative}
+.rbar i{width:9px;height:9px;border-radius:50%}
+.rbar b{position:absolute;left:0;right:0;text-align:center;font:600 10.5px var(--sans);color:#d9dde3}
+.rcanvas{position:relative;aspect-ratio:660/440;background:#fff;background-size:cover;background-position:center}
+.ricon{position:absolute;width:26%;top:30%;text-align:center}
+.ricon svg{width:78%;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25))}
+.ricon span{display:block;font:9.5px var(--sans);color:#333c48;margin-top:1px}
+.rcanvas.dark .ricon span{color:#e8ecf2}
+.ricon.a{left:8%}.ricon.b{right:8%}
+.rarrow{position:absolute;left:36%;right:36%;top:40%;height:13%;color:#b6c0cd}
+.rcanvas.dark .rarrow{color:rgba(255,255,255,.5)}
+.rarrow svg{width:100%;height:100%}
+.rtag{position:absolute;left:50%;bottom:7%;transform:translateX(-50%);
+  font:600 9.5px var(--mono);color:#fff;background:var(--ok);border-radius:99px;
+  padding:2px 9px;display:none}
+.rcanvas.signed .rtag{display:block}
+.ricon.a svg.alt{display:none}
+.rcanvas.alticon .ricon.a svg.def{display:none}
+.rcanvas.alticon .ricon.a svg.alt{display:block}
+.rcanvas.smallicons .ricon{width:19%;top:33%}
+.rcanvas.placed .ricon{top:44%}
+.rcanvas.placed .ricon.a{left:6%}
+.rcanvas.placed .ricon.b{right:6%}
+.rcap{margin-top:8px;text-align:center;font:11.5px var(--sans);color:var(--dim)}
+@media (max-width:760px){
+  .result{position:static;width:72%;margin:18px auto 0;transform:scale(.9);filter:none}
+  .result.show{transform:none}
+}
+.replay{background:none;border:1px solid var(--panel-line);color:var(--dim);
+  border-radius:8px;padding:6px 15px;font:12.5px var(--sans);cursor:pointer;margin-left:8px}
+.replay:hover{color:var(--fg);border-color:var(--accent)}
+
+footer{margin-top:64px;border-top:1px solid var(--line);padding:30px 0 46px}
+.frow{display:flex;justify-content:space-between;align-items:flex-start;gap:22px;flex-wrap:wrap}
+.fmark{margin:0;font:650 16px var(--mono);letter-spacing:-.02em;color:var(--fg)}
+.fdisc{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-2px;
+  background:url(logo-glyph-ink.png) center/contain no-repeat}
+@media (prefers-color-scheme: dark){.fdisc{background-image:url(logo-glyph-white.png)}}
+.fcredit{margin:7px 0 0;font-size:13px;color:var(--faint)}
+.fcredit a{color:var(--dim)}
+.fcredit .ke{display:inline-flex;align-items:center;gap:6px;vertical-align:-4px}
+.ke-mark{display:inline-block;width:16px;height:16px;background:url(logo-glyph-ink.png) center/contain no-repeat}
+@media (prefers-color-scheme: dark){.ke-mark{background-image:url(logo-glyph-white.png)}}
+.flinks{display:flex;gap:9px;flex-wrap:wrap}
+.flinks a{font:500 13px var(--sans);color:var(--dim);text-decoration:none!important;
+  border:1px solid var(--line);border-radius:999px;padding:8px 15px;transition:border-color .15s,color .15s}
+.flinks a:hover{color:var(--fg);border-color:var(--accent)}
+@media (max-width:640px){.frow{flex-direction:column;align-items:center;text-align:center}}
+.hireme{max-width:640px;margin:60px auto 0;text-align:center}
+.hireme .sec-p b{color:var(--fg);font-weight:600}
+.hire{display:inline-block;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--on-lime);background:var(--lime);border-radius:999px;padding:5px 13px;margin-bottom:16px}
+.ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.btn-lime{display:inline-block;background:var(--lime);color:var(--on-lime)!important;text-decoration:none!important;
+  border-radius:999px;padding:14px 30px;font:600 15px var(--sans);
+  box-shadow:0 10px 44px rgba(198,245,63,.45);transition:transform .15s,box-shadow .15s}
+.btn-lime:hover{background:var(--lime-hover);transform:translateY(-2px);
+  box-shadow:0 16px 56px rgba(198,245,63,.6)}
+.btn-ghost{display:inline-block;border:1px solid var(--line-2);color:var(--fg)!important;text-decoration:none!important;
+  border-radius:999px;padding:13px 26px;font:500 15px var(--sans);transition:border-color .15s,transform .15s}
+.btn-ghost:hover{border-color:var(--accent);transform:translateY(-2px)}
+
+@media (max-height:860px){
+  header{padding:26px 0 0}
+  h1{margin:12px 0 0;font-size:clamp(30px,5.5vw,44px)}
+  .tag{margin:9px auto 0;font-size:15.5px;max-width:52ch}
+  .install{margin-top:30px}
+  .cmdbar code{padding:12px 15px;font-size:14px}
+  .stagewrap{margin:20px auto 0}
+  .scen-title{margin-bottom:9px;font-size:14px}
+}
+@media (prefers-reduced-motion: reduce){
+  .sky i,.bob,.cursor{animation:none!important}
+  .up{opacity:1;transform:none;animation:none}
+  #tilt{transition:none}
+}
+</style>
+</head>
+<body>
+
+<div class="gridbg"></div>
+<div class="sky"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+<canvas class="net" id="net"></canvas>
+<div class="grain"></div>
+
+<div class="wrap">
+
+<header>
+  <h1 class="up d1">Your app deserves a<br><em>beautiful</em> installer.</h1>
+  <p class="tag up d2">When someone downloads your app, this window is your first hello.
+     <b>make-a-dmg</b> builds it for you — one command, using only what is already on your Mac.</p>
+
+  <div class="stagewrap up d3">
+    <p class="scen-title" id="scen">The tool's real output</p>
+    <div class="bob"><div id="tilt">
+      <div class="term">
+        <div class="tbar"><i class="r"></i><i class="y"></i><i class="g"></i><b>Terminal — zsh</b></div>
+        <div class="tbody" id="tb"><span class="pr">➜  ~ </span><span class="cursor"></span></div>
+      </div>
+    </div></div>
+    <div class="result" id="result">
+      <div class="rwin">
+        <div class="rbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><b>MyApp</b></div>
+        <div class="rcanvas" id="rcanvas">
+          <div class="ricon a">
+            <svg class="def" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="56" rx="13" fill="#4d9bff"/><path d="M20 42V22l12 10 12-10v20" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="alt" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="56" rx="13" fill="#ff7847"/><path d="M32 14l5.4 11 12.1 1.7-8.8 8.5 2.1 12-10.8-5.7-10.8 5.7 2.1-12-8.8-8.5 12.1-1.7z" fill="#fff"/></svg>
+            <span>MyApp</span>
+          </div>
+          <div class="rarrow"><svg viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M6 20h72m0 0-14-11m14 11-14 11" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="ricon b">
+            <svg viewBox="0 0 64 64"><path d="M6 18a4 4 0 0 1 4-4h14l5 6h25a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z" fill="#9aa4b2"/><path d="M32 28v14m0 0-6-6m6 6 6-6" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Applications</span>
+          </div>
+          <div class="rtag">signed</div>
+        </div>
+      </div>
+      <p class="rcap">MyApp-2.1.0.dmg — what your users open</p>
+    </div>
+    <div class="tnav">
+      <button id="prev" aria-label="previous example">‹</button>
+      <div class="dots" id="dots"></div>
+      <button id="next" aria-label="next example">›</button>
+    </div>
+    <p class="stagecap">Every line is what the tool actually prints — nothing staged.</p>
+  </div>
+
+  <div class="install up d5">
+    <p class="try">Like what you see? It works both ways — no install, or installed:</p>
+
+    <div class="paths">
+      <div class="path">
+        <b class="eyebrow">no install</b>
+        <h3>Run it once</h3>
+        <p>Straight from the web. Nothing is installed, nothing is left behind on your Mac.</p>
+        <div class="cmdbar">
+          <code id="heroCmd"><span class="p">bash</span> &lt;(curl -fsSL kodeelite.com/dmg)</code>
+          <button data-copy="heroCmd">Copy</button>
+        </div>
+      </div>
+      <div class="path">
+        <b class="eyebrow">install</b>
+        <h3>Keep it around</h3>
+        <p>One small command lands on your Mac — from then on it is simply <code>make-a-dmg</code> in any folder.</p>
+        <div class="cmdbar">
+          <code id="brewCmd"><span class="p">brew</span> install azharbinanwar/tap/make-a-dmg</code>
+          <button data-copy="brewCmd">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="meta">latest release
+      <a id="ver" href="https://github.com/azharbinanwar/make-a-dmg/releases/latest">on GitHub</a></p>
+  </div>
+</header>
+
+<!-- ============================ OVERVIEW ============================ -->
+<section class="overview">
+  <h2 class="sec-h">Every detail is yours to shape</h2>
+  <p class="sec-p">The defaults already look right — a tidy window, your app on the left, Applications on the
+     right, the app's own icon on the disk. When you care about more, each detail has a flag:</p>
+  <div class="ogrid">
+    <div><b>window size</b><span>any width and height you like — 660×500 is the default</span></div>
+    <div><b>icon size</b><span>from small and subtle to 200px showpieces</span></div>
+    <div><b>icon positions</b><span>put the app and Applications exactly where your art wants them</span></div>
+    <div><b>background image</b><span>your artwork, cropped, contained or stretched to fit</span></div>
+    <div><b>solid colour</b><span>just a hex like 1e1e1e — no image editor needed</span></div>
+    <div><b>retina artwork</b><span>@2x images stay sharp instead of going soft</span></div>
+    <div><b>volume name</b><span>what the window and the mounted disk call themselves</span></div>
+    <div><b>custom disk icon</b><span>hand it a PNG and the .icns is built for you</span></div>
+    <div><b>signing</b><span>your Developer ID — opt-in, never automatic</span></div>
+    <div><b>checksum</b><span>a SHA-256 written beside the dmg for release pages</span></div>
+    <div><b>guided wizard</b><span><code>-i</code> asks you one friendly question at a time</span></div>
+    <div><b>automation</b><span><code>-y</code> asks nothing; <code>--no-window</code> keeps build servers happy</span></div>
+  </div>
+  <p class="sec-p2">Every one of them is optional — and the
+     <a href="https://github.com/azharbinanwar/make-a-dmg#options">README</a> covers each flag in detail.</p>
+</section>
+
+<section class="hireme">
+  <span class="hire">open to freelance work</span>
+  <h2 class="sec-h">Want this kind of care on your project?</h2>
+  <p class="sec-p">make-a-dmg is written by <b>Azhar Ali</b> — a developer who sweats the last mile,
+     the part your users actually touch. If your app could use that, say hello.</p>
+  <div class="ctas">
+    <a class="btn-lime" href="mailto:azharbinanwar@gmail.com">Email me</a>
+    <a class="btn-ghost" href="https://www.linkedin.com/in/azharbinanwar">LinkedIn</a>
+    <a class="btn-ghost" href="https://github.com/azharbinanwar">GitHub</a>
+  </div>
+</section>
+
+<footer>
+  <div class="frow">
+    <div class="fbrand">
+      <p class="fmark"><span class="fdisc"></span>make-a-dmg</p>
+      <p class="fcredit">Built with care by
+        <a class="ke" href="https://kodeelite.com"><span class="ke-mark"></span>KodeElite</a></p>
+    </div>
+    <nav class="flinks">
+      <a href="https://github.com/azharbinanwar/make-a-dmg">GitHub</a>
+      <a href="https://github.com/azharbinanwar/make-a-dmg/releases/latest">Releases</a>
+      <a href="https://github.com/azharbinanwar/make-a-dmg/blob/main/LICENSE">MIT license</a>
+      <a href="#" class="ftop">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- node network: theirs, with the cursor as a live node ---------- */
+  var net = $('net');
+  if (net && !reduced) (function () {
+    var ctx = net.getContext('2d');
+    var css = getComputedStyle(document.documentElement);
+    function rgb(c) {
+      c = c.trim();
+      if (c.charAt(0) === '#') {
+        var n = parseInt(c.slice(1), 16);
+        return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+      }
+      return c.replace(/^rgba?\(|\)$/g, '').split(',').slice(0, 3).join(',');
+    }
+    var nodeCol = css.getPropertyValue('--net-node').trim() || 'rgba(0,0,0,.35)';
+    var hotCol  = css.getPropertyValue('--net-hot').trim()  || '#6C8F00';
+    var hotRGB = rgb(hotCol), nodeRGB = rgb(nodeCol);
+    var dpr = Math.min(devicePixelRatio || 1, 2), w = 0, h = 0;
+    function resize() {
+      w = innerWidth; h = innerHeight;
+      net.width = w * dpr; net.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize(); addEventListener('resize', resize);
+    var COUNT = Math.max(44, Math.min(110, Math.round(w * h / 13000)));
+    var LINK = 165, nodes = [], pulses = [], mx = -9999, my = -9999;
+    for (var i = 0; i < COUNT; i++) nodes.push({
+      x: Math.random() * w, y: Math.random() * h,
+      vx: (Math.random() - .5) * .22, vy: (Math.random() - .5) * .22,
+      r: Math.random() * 1.8 + 1.2, hot: Math.random() < .3
+    });
+    addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; }, { passive: true });
+    document.documentElement.addEventListener('mouseleave', function () { mx = my = -9999; });
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      for (var k = 0; k < nodes.length; k++) {
+        var n = nodes[k];
+        // the cursor tugs gently on whatever drifts near it
+        if (mx > -999) {
+          var dx = mx - n.x, dy = my - n.y, d = Math.hypot(dx, dy);
+          if (d < 200 && d > 1) { var f = (1 - d / 200) * .012; n.vx += dx / d * f; n.vy += dy / d * f; }
+        }
+        n.vx *= .995; n.vy *= .995;
+        var sp = Math.hypot(n.vx, n.vy);
+        if (sp > .5) { n.vx *= .5 / sp; n.vy *= .5 / sp; }
+        n.x += n.vx; n.y += n.vy;
+        if (n.x < -20) n.x = w + 20; if (n.x > w + 20) n.x = -20;
+        if (n.y < -20) n.y = h + 20; if (n.y > h + 20) n.y = -20;
+      }
+      for (var a2 = 0; a2 < nodes.length; a2++) for (var b2 = a2 + 1; b2 < nodes.length; b2++) {
+        var a = nodes[a2], b = nodes[b2], dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist >= LINK) continue;
+        var alpha = (1 - dist / LINK) * .3;
+        ctx.strokeStyle = a.hot && b.hot
+          ? 'rgba(' + hotRGB + ',' + (alpha * 1.6) + ')'
+          : 'rgba(' + nodeRGB + ',' + (alpha * .55) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        if (Math.random() < .0005 && pulses.length < 10) pulses.push({ a: a, b: b, t: 0 });
+      }
+      if (mx > -999) for (var q = 0; q < nodes.length; q++) {
+        var nq = nodes[q], dq = Math.hypot(nq.x - mx, nq.y - my);
+        if (dq < LINK) {
+          ctx.strokeStyle = 'rgba(' + hotRGB + ',' + ((1 - dq / LINK) * .3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(nq.x, nq.y); ctx.stroke();
+        }
+      }
+      for (var m = 0; m < nodes.length; m++) {
+        var n2 = nodes[m];
+        ctx.fillStyle = n2.hot ? 'rgba(' + hotRGB + ',0.9)' : nodeCol;
+        ctx.beginPath(); ctx.arc(n2.x, n2.y, n2.r, 0, Math.PI * 2); ctx.fill();
+        if (n2.hot) {
+          ctx.fillStyle = 'rgba(' + hotRGB + ',0.16)';
+          ctx.beginPath(); ctx.arc(n2.x, n2.y, n2.r * 4.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      pulses = pulses.filter(function (p) { return p.t < 1; });
+      for (var pi = 0; pi < pulses.length; pi++) {
+        var p = pulses[pi]; p.t += .02;
+        var px = p.a.x + (p.b.x - p.a.x) * p.t, py = p.a.y + (p.b.y - p.a.y) * p.t;
+        ctx.fillStyle = 'rgba(' + hotRGB + ',0.95)';
+        ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(' + hotRGB + ',0.18)';
+        ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  /* ---------- 3D tilt on the terminal ---------- */
+  var tilt = $('tilt'), tx = 0, ty = 0, cx = 0, cy = 0;
+  if (!reduced) {
+    addEventListener('pointermove', function (e) {
+      var r = tilt.getBoundingClientRect();
+      if (!r.width) return;
+      var px = (e.clientX - r.left) / r.width - .5;
+      var py = (e.clientY - r.top) / r.height - .5;
+      var near = Math.abs(px) < 1.4 && Math.abs(py) < 1.4;
+      tx = near ? px * 7 : 0;
+      ty = near ? py * -5 : 0;
+    });
+    (function loop() {
+      cx += (tx - cx) * .08; cy += (ty - cy) * .08;
+      tilt.style.transform = 'rotateY(' + cx + 'deg) rotateX(' + cy + 'deg)';
+      requestAnimationFrame(loop);
+    })();
+  }
+
+  /* ---------- the build, replayed: a different job each time ---------- */
+  function L(cls, txt){ return '<span class="' + cls + '">' + txt + '</span>'; }
+  var BANNER = [L('cy bd','  \u25c6  make-a-dmg 1.0.1') + L('dm','  ~/Desktop'), 350];
+  var DONE   = [L('gn bd','  \u2713 done') + '  ' + L('dm','~/Desktop/MyApp-2.1.0.dmg'), 0];
+  var SCEN = [
+    { rbg:'#fff', ar:'660/440',
+      name: 'A default build — nothing but the app.',
+      cmd: 'bash <(curl -fsSL kodeelite.com/dmg) MyApp.app -y',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Icon'),190], [L('gn','     ✓') + ' using the app’s own icon',210],
+        [L('cy bd','  ▸ Build plan'),190],
+        [L('dm','     window      660x500, icons 120px'),140],
+        [L('dm','     output      ~/Desktop/MyApp-2.1.0.dmg'),160],
+        [L('cy bd','  ▸ Building the dmg'),290],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        ['',150], DONE ] },
+    { rbg:'#1e1e1e', dark:true, ar:'660/440',
+      name: 'Custom background — a hex colour, no image editor.',
+      cmd: 'make-a-dmg MyApp.app -y --background 1e1e1e --sha256',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Build plan'),190],
+        [L('dm','     background  solid #1e1e1e  (660x500)'),150],
+        [L('dm','     checksum    yes  (.sha256)'),150],
+        [L('cy bd','  ▸ Building the dmg'),290],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        [L('gn','     ✓') + ' wrote MyApp-2.1.0.dmg.sha256',290],
+        ['',150], DONE ] },
+    { rbg:'radial-gradient(130% 140% at 16% 6%,rgba(198,245,63,.9) 0%,rgba(198,245,63,0) 46%),linear-gradient(135deg,#050505 0%,#243500 55%,#4D6B00 100%)', dark:true, ar:'660/440',
+      name: 'Custom artwork — kept sharp on retina screens.',
+      cmd: 'make-a-dmg MyApp.app -y --background art/bg.png',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Build plan'),190],
+        [L('dm','     background  art/bg.png  (1320x1000 cropped to fill 660x500)'),160],
+        [L('cy bd','  ▸ Building the dmg'),320],
+        [L('dm','     retina background (background.png, 2x at 144 dpi)'),230],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        ['',150], DONE ] },
+    { rbg:'#fff', ar:'800/400', small:true,
+      name: 'Custom window and icon size — any shape you like.',
+      cmd: 'make-a-dmg MyApp.app -y --window-size 800x400 --icon-size 96',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Build plan'),190],
+        [L('dm','     window      800x400, icons 96px'),150],
+        [L('dm','     layout      app 200,152  ·  Applications 600,152'),150],
+        [L('cy bd','  ▸ Building the dmg'),290],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        ['',150], DONE ] },
+    { rbg:'#fff', ar:'660/440', placed:true,
+      name: 'Exact icon placement — and your own volume name.',
+      cmd: 'make-a-dmg MyApp.app -y --app-pos 60,240 --drop-pos 500,240 --volname "MyApp 2.1"',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Build plan'),190],
+        [L('dm','     volume      MyApp 2.1'),150],
+        [L('dm','     layout      app 60,240  ·  Applications 500,240'),150],
+        [L('cy bd','  ▸ Building the dmg'),290],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        ['',150], DONE ] },
+    { rbg:'#fff', ar:'660/440', alticon:true, signed:true,
+      name: 'Custom icon, and signed with your Developer ID.',
+      cmd: 'make-a-dmg MyApp.app -y --icon brand/icon.png --sign "KodeElite"',
+      lines: [ ['',0], BANNER, ['',120],
+        [L('cy bd','  ▸ App'),190], [L('gn','     ✓') + ' MyApp.app  ' + L('dm','(v2.1.0)'),210],
+        [L('cy bd','  ▸ Icon'),190], [L('gn','     ✓') + ' built icon from icon.png',210],
+        [L('cy bd','  ▸ Signing'),190],
+        [L('gn','     ✓') + ' Developer ID Application: KodeElite (TEAM222)',230],
+        [L('cy bd','  ▸ Building the dmg'),290],
+        [L('gn','     ✓') + ' window styled',520],
+        [L('gn','     ✓') + ' created MyApp-2.1.0.dmg',290],
+        [L('gn','     ✓') + ' signed',290],
+        ['',150], DONE ] }
+  ];
+  var tb = $('tb'), idx = 0, timers = [];
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  function showResult(sc) {
+    var c = $('rcanvas');
+    c.className = 'rcanvas' + (sc.dark ? ' dark' : '') + (sc.signed ? ' signed' : '')
+                + (sc.alticon ? ' alticon' : '') + (sc.small ? ' smallicons' : '')
+                + (sc.placed ? ' placed' : '');
+    c.style.background = sc.rbg;
+    c.style.aspectRatio = sc.ar;
+    $('result').classList.add('show');
+  }
+  function play() {
+    clearTimers();
+    $('result').classList.remove('show');
+    var sc = SCEN[idx];
+    mark();
+    $('scen').textContent = sc.name;
+    tb.innerHTML = '<span class="pr">\u279c  ~ </span>';
+    var i = 0;
+    function type() {
+      if (i <= sc.cmd.length) {
+        tb.innerHTML = '<span class="pr">\u279c  ~ </span><span class="in">' + sc.cmd.slice(0, i) + '</span><span class="cursor"></span>';
+        i++; timers.push(setTimeout(type, reduced ? 0 : 16));
+      } else {
+        tb.innerHTML = '<span class="pr">\u279c  ~ </span><span class="in">' + sc.cmd + '</span>\n';
+        emit(0);
+      }
+    }
+    function emit(n) {
+      if (n >= sc.lines.length) {
+        tb.innerHTML += '\n<span class="pr">\u279c  ~ </span><span class="cursor"></span>';
+        // the point of it all: the finished dmg pops up, styled by this job
+        timers.push(setTimeout(function(){ showResult(sc); }, 180));
+        timers.push(setTimeout(next, 3200));
+        return;
+      }
+      tb.innerHTML += sc.lines[n][0] + '\n';
+      timers.push(setTimeout(function(){ emit(n+1); }, reduced ? 0 : sc.lines[n][1]));
+    }
+    type();
+  }
+  var dots = $('dots');
+  SCEN.forEach(function (_, n) {
+    var d = document.createElement('i');
+    d.onclick = function(){ clearTimers(); idx = n; play(); };
+    dots.appendChild(d);
+  });
+  function mark(){ [].forEach.call(dots.children, function(d,n){ d.classList.toggle('on', n === idx); }); }
+  function next(){ idx = (idx + 1) % SCEN.length; play(); }
+  $('next').onclick = function(){ clearTimers(); next(); };
+  $('prev').onclick = function(){ clearTimers(); idx = (idx - 1 + SCEN.length) % SCEN.length; play(); };
+  // start once the entrance animation has landed
+  setTimeout(play, reduced ? 0 : 700);
+
+  /* ---------- version + copy ---------- */
+  fetch('https://api.github.com/repos/azharbinanwar/make-a-dmg/releases/latest')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { if (j && j.tag_name) $('ver').textContent = j.tag_name; })
+    .catch(function () {});
+
+  function copyText(t, done) {
+    if (navigator.clipboard && isSecureContext) navigator.clipboard.writeText(t).then(done);
+    else {
+      var ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } finally { ta.remove(); }
+    }
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.onclick = function () {
+      copyText($(b.dataset.copy).textContent, function () {
+        b.textContent = 'Copied'; b.classList.add('done');
+        setTimeout(function () { b.textContent = 'Copy'; b.classList.remove('done'); }, 1400);
+      });
+    };
+  });
+})();
+</script>
+</body>
+</html>
