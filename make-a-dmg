@@ -173,11 +173,11 @@ detach(){ local m=$1 i; for i in 1 2 3 4 5; do hdiutil detach "$m" -quiet >/dev/
 attach_rw(){ # $1 dmg -> echoes the mountpoint
   # hdiutil can fail transiently on a busy Mac, and a still-detaching volume from
   # a previous run is enough to lose one attempt, so do not give up on the first.
-  local i m
-  for i in 1 2 3 4 5; do
+  local n=0 m
+  while [ "$n" -lt 5 ]; do
     m="$(hdiutil attach "$1" -readwrite -noverify -noautoopen 2>/dev/null | grep -o '/Volumes/.*' | tail -1)"
     [ -n "$m" ] && { printf '%s' "$m"; return 0; }
-    sleep 2
+    n=$((n+1)); sleep 2
   done
   return 1; }
 

@@ -25,11 +25,11 @@ no(){ printf "  FAIL %s\n" "$1"; fail=$((fail+1)); }
 # hdiutil attach fails transiently on a loaded machine, and a volume still
 # detaching from the previous check is enough to lose an attempt. Without the
 # retry the suite fails on a different random test each CI run.
-mount_dmg(){ local i m
-  for i in 1 2 3 4 5; do
+mount_dmg(){ local n=0 m
+  while [ "$n" -lt 5 ]; do
     m="$(hdiutil attach "$1" -nobrowse -noautoopen 2>/dev/null | grep -o '/Volumes/.*' | tail -1)"
     [ -n "$m" ] && { printf '%s' "$m"; return 0; }
-    sleep 2
+    n=$((n+1)); sleep 2
   done
   return 1; }
 bg_dims(){ local M f d; M="$(mount_dmg "$1")"; f="$(ls "$M"/.background/* 2>/dev/null | head -1)"
