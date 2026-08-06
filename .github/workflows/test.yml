@@ -7,21 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Static analysis needs no macOS, and running it on Linux avoids installing
+  # anything through Homebrew on the macOS image.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: shellcheck
+        run: shellcheck --severity=warning make-a-dmg test.sh
+
   test:
     # macOS runner required: the whole tool is hdiutil, sips, iconutil and osascript
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: bash version
         run: bash --version | head -1
 
-      - name: shellcheck
-        run: |
-          brew install shellcheck
-          shellcheck --severity=warning make-a-dmg test.sh
-
       - name: smoke tests
-        # test.sh deliberately skips Finder window styling, which needs a desktop
-        # session and would false-fail on a headless runner
-        run: ./test.sh
+        # --full: every check, including the build-heavy ones a local run skips.
+        # Finder window styling is never checked here — it needs a desktop
+        # session and would false-fail on a headless runner.
+        run: ./test.sh --full

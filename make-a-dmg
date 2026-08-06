@@ -80,6 +80,8 @@ Options:
                        them to choose from (never signs unless you ask)
   --sha256             also write <dmg>.sha256 next to the dmg
   --no-open            don't reveal the dmg in Finder when done
+  --no-window          skip the Finder window layout; the dmg still works, it is
+                       just not laid out. For build servers with no desktop.
   -y, --yes            no prompts
   -h, --help           this help
 EOF
@@ -364,7 +366,8 @@ wizard(){
 APP=""; BG=""; ICON=""; NOICON=false; VOL=""; OUT=""; VER=""; SIGN=""; SIGN_ID=""
 WSIZE=""; ISIZE=120; APOS=""; DPOS=""
 WSIZE_SET=false; APOS_SET=false; DPOS_SET=false
-DOSHA=false; DOOPEN=true; YES=false; INTERACTIVE=false; FIT=crop; FIT_SET=false; BG_SET=false
+DOSHA=false; DOOPEN=true; DOWINDOW=true; YES=false; INTERACTIVE=false
+FIT=crop; FIT_SET=false; BG_SET=false
 while [ $# -gt 0 ]; do case "$1" in
   -i|--interactive|--wizard) INTERACTIVE=true; shift ;;
   --background) chk "$1" "${2:-}"; BG="$2"; BG_SET=true; shift 2 ;;
@@ -383,6 +386,7 @@ while [ $# -gt 0 ]; do case "$1" in
                 case "${2:-}" in ""|-*|*.app|*.APP) shift ;; *) SIGN="$2"; shift 2 ;; esac ;;
   --sha256)     DOSHA=true; shift ;;
   --no-open)    DOOPEN=false; shift ;;
+  --no-window)  DOWINDOW=false; shift ;;
   -y|--yes)     YES=true; shift ;;
   -h|--help)    usage; exit 0 ;;
   -*)           die "Unknown option: $1" ;;
@@ -534,7 +538,7 @@ row "app"        "${APP_ABS/#$HOME/~}${VER:+  (v$VER)}"
 row "volume"     "$VOL"
 row "icon"       "$([ -n "$ICNS" ] && echo "${ICNS/#$HOME/~}$ICNS_NOTE" || echo '«none»')"
 row "background" "$BG_ROW"
-row "window"     "${W}x${H}, icons ${ISIZE}px"
+row "window"     "$([ "$DOWINDOW" = true ] && echo "${W}x${H}, icons ${ISIZE}px" || echo "«not laid out (--no-window)»")"
 row "layout"     "app ${AX},${AY}  ·  Applications ${DX},${DY}"
 [ -n "$SIGN_ID" ] && row "signing" "$SIGN_ID$(for_release "$SIGN_ID" || echo "  ${Y}! not for distribution${R}")"
 row "checksum"   "$([ "$DOSHA" = true ] && echo 'yes  (.sha256)' || echo 'no')"
@@ -655,17 +659,23 @@ run_layout(){
   sync
   [ "$(stat -f%z "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" -ge 4096 ]
 }
-# Make sure Finder is up and ready before scripting it. A cold or just-launched
-# Finder ignores the very first attempt, which is why the first build could fail.
-osascript -e 'tell application "Finder" to launch' >/dev/null 2>&1 || true
-sleep 1
 styled=false
-for _a in 1 2 3 4 5; do
-  run_layout && { styled=true; break; }
-  osascript -e 'tell application "Finder" to close every Finder window' >/dev/null 2>&1 || true
+if [ "$DOWINDOW" != true ]; then
+  sub "skipping the window layout (--no-window)"
+else
+  # Make sure Finder is up and ready before scripting it. A cold or just-launched
+  # Finder ignores the very first attempt, which is why the first build could fail.
+  osascript -e 'tell application "Finder" to launch' >/dev/null 2>&1 || true
   sleep 1
-done
-if [ "$styled" = true ]; then
+  for _a in 1 2 3 4 5; do
+    run_layout && { styled=true; break; }
+    osascript -e 'tell application "Finder" to close every Finder window' >/dev/null 2>&1 || true
+    sleep 1
+  done
+fi
+if [ "$DOWINDOW" != true ]; then
+  :
+elif [ "$styled" = true ]; then
   ok "window styled"
 else
   warn "Window not styled (Finder did not save the layout)."

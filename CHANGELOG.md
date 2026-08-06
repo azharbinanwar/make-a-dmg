@@ -60,7 +60,8 @@ brew install azharbinanwar/tap/make-a-dmg     # or install it
   file chosen through a picker can be identified.
 - `--version` reports which version you have, and it is shown on every run.
   The app's own version is overridden with `--app-version`.
-- `-y` for unattended use in CI and scripts.
+- `-y` for unattended use in CI and scripts, and `--no-window` to skip the
+  Finder layout on a build server with no desktop session.
 - Pickers fall back to numbered input when stdin is not a terminal, so scripted
   and piped use behaves predictably.
 

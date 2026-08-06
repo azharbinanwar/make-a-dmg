@@ -247,6 +247,7 @@ You will see `retina background (…, 2x at 144 dpi)` in the build output when i
 --sign [IDENTITY]    sign the dmg; picks or lists your identities (never signs unless asked)
 --sha256             also write <dmg>.sha256 next to the dmg
 --no-open            do not reveal the dmg in Finder when done
+--no-window          skip the Finder window layout; for build servers with no desktop
 -y, --yes            non-interactive: no prompts
 -h, --help           show help
 ```
@@ -364,14 +365,15 @@ macOS only. Uses `hdiutil`, `osascript`, `sips`, `iconutil`, all built in. No Ho
 A self-contained smoke test creates its own throwaway app and backgrounds, builds real disk images, mounts them and checks what is inside.
 
 ```sh
-./test.sh
+./test.sh          # quick: one build plus every instant check   ~16s
+./test.sh --full   # everything, eight builds                    ~2m
 ```
 
 ```
-==== 17 passed, 0 failed ====
+==== 18 passed, 0 failed ====
 ```
 
-It exits non-zero on failure, so it works as a release gate. See **[TESTING.md](TESTING.md)** for what each check guards against, what is deliberately left out, and the manual checks worth doing before a release.
+It exits non-zero on failure, so it works as a release gate. CI runs `--full` on every push. See **[TESTING.md](TESTING.md)** for what each check guards against, what is deliberately left out, and the manual checks worth doing before a release.
 
 ---
 

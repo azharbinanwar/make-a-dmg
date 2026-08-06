@@ -1,24 +1,31 @@
 # Testing
 
-Run everything with one command:
+Two modes:
 
 ```sh
-./test.sh
+./test.sh          # quick: one build plus every instant check   ~16s
+./test.sh --full   # everything, eight builds                    ~2m
 ```
 
-It creates its own throwaway `.app` and background images, builds real disk
-images, mounts them, checks what is inside, and cleans up after itself. Nothing
-is installed and nothing is left behind. Expect a couple of minutes, and a
-`0 failed` at the end.
+Quick is for while you work — it still catches anything that breaks argument
+handling, help, signing refusal or the build itself. **Full is what CI runs, and
+what to run before a release.**
+
+The suite creates its own throwaway `.app` and background images, builds real
+disk images, mounts them, checks what is inside, and cleans up after itself.
+Nothing is installed and nothing is left behind.
 
 ```
 running make-a-dmg smoke tests...
   ok   builds a valid dmg
   ...
-==== 17 passed, 0 failed ====
+==== 18 passed, 0 failed ====
 ```
 
 It exits non-zero on any failure, so it works as a release gate and in CI.
+
+Builds pass `--no-window`, because the Finder layout cannot be verified without
+a desktop session anyway and retrying it costs about seven seconds per build.
 
 ---
 
@@ -43,6 +50,10 @@ It exits non-zero on any failure, so it works as a release gate and in CI.
 | 15 | Rejects bad numeric options cleanly | raw `unbound variable` crashes |
 | 16 | Reports a missing option value | `--volname` with nothing after it |
 | 17 | A quoted volume name survives | a `"` in a name breaking the AppleScript |
+| 18 | `--version` reports the tool version | no way to tell which version is installed |
+
+Checks that build a disk image run only under `--full`. The rest are instant and
+run every time.
 
 ---
 
@@ -120,6 +131,10 @@ Expect `valid on disk` and `satisfies its Designated Requirement`, plus a
 
 ## Continuous integration
 
-`.github/workflows/test.yml` runs `shellcheck` and the full suite on
-`macos-latest` for every push and pull request. A macOS runner is required —
-the entire tool is `hdiutil`, `sips`, `iconutil` and `osascript`.
+`.github/workflows/test.yml` runs two jobs in parallel on every push and pull
+request:
+
+- **lint** on `ubuntu-latest` — `shellcheck --severity=warning`. Static analysis
+  needs no macOS, and keeping it on Linux is faster.
+- **test** on `macos-latest` — `./test.sh --full`. A macOS runner is required
+  here; the entire tool is `hdiutil`, `sips`, `iconutil` and `osascript`.
