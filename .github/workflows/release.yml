@@ -85,12 +85,13 @@ jobs:
       - name: bump the Homebrew formula
         if: steps.check.outputs.fresh == 'true'
         env:
-          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
         run: |
           v='${{ steps.check.outputs.version }}'
           url="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
           sha="$(curl -fsSL "$url" | shasum -a 256 | cut -d' ' -f1)"
-          git clone -q "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository_owner }}/homebrew-tap.git" tap
+          # The tap is public, so cloning needs no credentials at all.
+          git clone -q "https://github.com/${{ github.repository_owner }}/homebrew-tap.git" tap
           cd tap
           sed -i '' -e "s|^  url .*|  url \"$url\"|" \
                     -e "s|^  sha256 .*|  sha256 \"$sha\"|" Formula/make-a-dmg.rb
@@ -98,4 +99,9 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -qam "make-a-dmg $v"
-          git push -q origin HEAD
+          # Auth goes in a header, not the URL. A stray newline in the secret
+          # makes the URL form die with "Malformed input to a URL function",
+          # so the token is stripped of whitespace first.
+          tok="$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')"
+          auth="$(printf 'x-access-token:%s' "$tok" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" push -q origin HEAD
