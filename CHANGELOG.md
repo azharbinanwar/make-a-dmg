@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 This project follows [Semantic Versioning](https://semver.org/), and the format
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.1] — 2026-08-06
 
 ### Added
 - `--no-window` skips the Finder window layout, for build servers with no
@@ -103,4 +103,5 @@ macOS only. Uses `hdiutil`, `osascript`, `sips`, `iconutil`, `PlistBuddy`,
 command line tools are used for the disk icon when present, and their absence is
 reported rather than silently ignored.
 
+[1.0.1]: https://github.com/azharbinanwar/make-a-dmg/releases/tag/v1.0.1
 [1.0.0]: https://github.com/azharbinanwar/make-a-dmg/releases/tag/v1.0.0
