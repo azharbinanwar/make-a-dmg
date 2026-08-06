@@ -170,6 +170,16 @@ fit_bg(){ # $1 mode  $2 file(in place)  $3 W  $4 H  $5 dpi -> place image into W
 }
 detach(){ local m=$1 i; for i in 1 2 3 4 5; do hdiutil detach "$m" -quiet >/dev/null 2>&1 && return 0; sleep 1; done
   hdiutil detach "$m" -force -quiet >/dev/null 2>&1 || true; }
+attach_rw(){ # $1 dmg -> echoes the mountpoint
+  # hdiutil can fail transiently on a busy Mac, and a still-detaching volume from
+  # a previous run is enough to lose one attempt, so do not give up on the first.
+  local i m
+  for i in 1 2 3 4 5; do
+    m="$(hdiutil attach "$1" -readwrite -noverify -noautoopen 2>/dev/null | grep -o '/Volumes/.*' | tail -1)"
+    [ -n "$m" ] && { printf '%s' "$m"; return 0; }
+    sleep 2
+  done
+  return 1; }
 
 signing_ids(){ # every codesigning identity in the keychain, one per line
   security find-identity -v -p codesigning 2>/dev/null \
@@ -584,8 +594,7 @@ SIZE_MB=$(( $(du -sk "$STAGE" | cut -f1) / 1024 + 60 ))
 [ "$SIZE_MB" -lt 20 ] && SIZE_MB=20
 hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ \
   -fsargs "-c c=64,a=16,e=16" -format UDRW -size "${SIZE_MB}m" "$RW" >/dev/null
-MOUNT="$(hdiutil attach "$RW" -readwrite -noverify -noautoopen | grep -o '/Volumes/.*' | tail -1)"
-[ -n "$MOUNT" ] || die "Could not mount the working dmg."
+MOUNT="$(attach_rw "$RW")" || die "Could not mount the working dmg."
 
 if [ -n "$ICNS" ] && have SetFile; then SetFile -a C "$MOUNT" 2>/dev/null || true; fi
 
