@@ -243,13 +243,13 @@ You will see `retina background (…, 2x at 144 dpi)` in the build output when i
 --app-pos X,Y        position of the app icon (default: auto-centered)
 --drop-pos X,Y       position of the Applications link (default: auto-centered)
 --app-version VER    override the app version used in the output name
--V, --version        print the version of make-a-dmg itself
+-v, --version        print the version of make-a-dmg itself (also -V)
 --sign [IDENTITY]    sign the dmg; picks or lists your identities (never signs unless asked)
 --sha256             also write <dmg>.sha256 next to the dmg
 --no-open            do not reveal the dmg in Finder when done
 --no-window          skip the Finder window layout; for build servers with no desktop
 -y, --yes            non-interactive: no prompts
--h, --help           show help
+-h, --help           show help (also: make-a-dmg help)
 ```
 
 A name typed without `.dmg` gets it added, and a missing output folder is created. If the path you give `--background` or `--icon` is not there, a picker opens so you can choose the file instead of starting over — unless you passed `-y`, where it just fails.

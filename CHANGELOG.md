@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 This project follows [Semantic Versioning](https://semver.org/), and the format
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- `--no-window` skips the Finder window layout, for build servers with no
+  desktop session. The dmg still builds and works, it is just not laid out.
+- `./test.sh` now runs a quick subset by default; `./test.sh --full` runs
+  everything and is what CI runs.
+- `-v` as well as `-V` for the version, since it is what most people try first.
+- A bare `make-a-dmg help` shows the help. Without it the word was read as a
+  path, and you were told "Not a folder/app: help".
+
+### Fixed
+- `hdiutil attach` is retried. It fails transiently on a loaded machine, and a
+  volume still detaching from a previous run was enough to lose an attempt and
+  fail the build.
+
 ## [1.0.0] — 2026-08-06
 
 First public release.
@@ -60,8 +76,7 @@ brew install azharbinanwar/tap/make-a-dmg     # or install it
   file chosen through a picker can be identified.
 - `--version` reports which version you have, and it is shown on every run.
   The app's own version is overridden with `--app-version`.
-- `-y` for unattended use in CI and scripts, and `--no-window` to skip the
-  Finder layout on a build server with no desktop session.
+- `-y` for unattended use in CI and scripts.
 - Pickers fall back to numbered input when stdin is not a terminal, so scripted
   and piped use behaves predictably.
 

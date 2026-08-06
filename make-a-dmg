@@ -75,7 +75,7 @@ Options:
   --app-pos X,Y        position of the app icon (default: 180,200)
   --drop-pos X,Y       position of the Applications link (default: 480,200)
   --app-version VER    override the app version used in the output name
-  -V, --version        print the version of make-a-dmg itself
+  -v, --version        print the version of make-a-dmg itself (also -V)
   --sign [IDENTITY]    sign the dmg; bare --sign picks your identity, or lists
                        them to choose from (never signs unless you ask)
   --sha256             also write <dmg>.sha256 next to the dmg
@@ -83,7 +83,7 @@ Options:
   --no-window          skip the Finder window layout; the dmg still works, it is
                        just not laid out. For build servers with no desktop.
   -y, --yes            no prompts
-  -h, --help           this help
+  -h, --help           this help (also: make-a-dmg help)
 EOF
 }
 
@@ -381,14 +381,16 @@ while [ $# -gt 0 ]; do case "$1" in
   --app-pos)    chk "$1" "${2:-}" '^-?[0-9]+,-?[0-9]+$' 'X,Y like 180,200'; APOS="$2"; APOS_SET=true; shift 2 ;;
   --drop-pos)   chk "$1" "${2:-}" '^-?[0-9]+,-?[0-9]+$' 'X,Y like 480,200'; DPOS="$2"; DPOS_SET=true; shift 2 ;;
   --app-version) chk "$1" "${2:-}"; VER="$2"; shift 2 ;;
-  -V|--version) printf 'make-a-dmg %s\n' "$VERSION"; exit 0 ;;
+  -v|-V|--version) printf 'make-a-dmg %s\n' "$VERSION"; exit 0 ;;
   --sign)       SIGN=auto   # bare --sign auto-picks; a following word names the identity
                 case "${2:-}" in ""|-*|*.app|*.APP) shift ;; *) SIGN="$2"; shift 2 ;; esac ;;
   --sha256)     DOSHA=true; shift ;;
   --no-open)    DOOPEN=false; shift ;;
   --no-window)  DOWINDOW=false; shift ;;
   -y|--yes)     YES=true; shift ;;
-  -h|--help)    usage; exit 0 ;;
+  # bare "help" too: without it the word is read as a path and you get
+  # "Not a folder/app: help", which points at the wrong problem
+  -h|--help|help) usage; exit 0 ;;
   -*)           die "Unknown option: $1" ;;
   *)            [ -z "$APP" ] && APP="$1" || die "Unexpected argument: $1"; shift ;;
 esac; done
