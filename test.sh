@@ -8,7 +8,17 @@ set -u
 BIN="$(cd "$(dirname "$0")" && pwd)/make-a-dmg"
 [ -x "$BIN" ] || { echo "make-a-dmg not found or not executable next to test.sh"; exit 2; }
 
-WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d)"
+# Detach anything still mounted from a dmg under $WORK, so a run that dies
+# halfway does not leave volumes behind in /Volumes.
+cleanup(){
+  hdiutil info 2>/dev/null | awk -v w="$WORK" '
+    /^image-path/ { p=substr($0, index($0,":")+2); next }
+    index($0,"/Volumes/") && index(p,w)==1 { print substr($0, index($0,"/Volumes/")) }' \
+  | while IFS= read -r m; do hdiutil detach "$m" -force -quiet 2>/dev/null; done
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
 pass=0; fail=0
 ok(){ printf "  ok   %s\n" "$1"; pass=$((pass+1)); }
 no(){ printf "  FAIL %s\n" "$1"; fail=$((fail+1)); }
@@ -48,8 +58,14 @@ case "$M" in *"Demo Vol") ok "--volname sets the volume name" ;; *) no "volume n
 hdiutil detach "$M" -quiet 2>/dev/null
 
 # 4) version override shows in the name
-mkdir -p "$WORK/vd"; ( cd "$WORK/vd" && "$BIN" "$APP" -y --version 9.9.9 >/dev/null 2>&1 )
-[ -f "$WORK/vd/DemoApp-9.9.9.dmg" ] && ok "--version overrides the name" || no "version override name"
+mkdir -p "$WORK/vd"; ( cd "$WORK/vd" && "$BIN" "$APP" -y --app-version 9.9.9 >/dev/null 2>&1 )
+[ -f "$WORK/vd/DemoApp-9.9.9.dmg" ] && ok "--app-version overrides the name" || no "app version override name"
+
+# 4b) --version reports the tool's own version, and does not build anything
+case "$("$BIN" --version 2>&1)" in
+  "make-a-dmg "[0-9]*) ok "--version reports the tool version" ;;
+  *) no "--version reports the tool version" ;;
+esac
 
 # 5) background: crop fits the image to the window (default 660x500)
 "$BIN" "$APP" -y --background "$WORK/bg.png" -o "$WORK/crop.dmg" >/dev/null 2>&1
@@ -65,6 +81,40 @@ mkdir -p "$WORK/vd"; ( cd "$WORK/vd" && "$BIN" "$APP" -y --version 9.9.9 >/dev/n
 
 # 8) an invalid --fit is rejected
 if "$BIN" "$APP" -y --fit bogus -o "$WORK/bad.dmg" >/dev/null 2>&1; then no "rejects an invalid --fit"; else ok "rejects an invalid --fit"; fi
+
+# 9) an unknown signing identity fails, and fails before building anything
+if "$BIN" "$APP" -y --sign "No Such Identity 0000" -o "$WORK/sg.dmg" >/dev/null 2>&1
+then no "rejects an unknown signing identity"
+else [ -f "$WORK/sg.dmg" ] && no "bails out before building" || ok "rejects an unknown signing identity"; fi
+
+# 10) signing is opt-in: a default build is left unsigned
+if codesign -dv "$WORK/a.dmg" >/dev/null 2>&1; then no "default build stays unsigned"; else ok "default build stays unsigned"; fi
+
+# 11) --help works off a consumed pipe (the `bash <(curl ...)` path) and leaks no source
+H="$(bash <(cat "$BIN") --help 2>&1)"
+case "$H" in
+  "make-a-dmg "*": turn a macOS"*) case "$H" in *"set -euo pipefail"*) no "--help leaks source lines" ;;
+                                                *) ok "--help works over a pipe, no source leak" ;; esac ;;
+  *) no "--help over a pipe" ;;
+esac
+
+# 12) bad numeric options are rejected instead of crashing bash
+nf=0
+for bad in "--window-size abc" "--icon-size foo" "--app-pos hi" "--drop-pos 1,2,3"; do
+  set -- $bad
+  out="$("$BIN" "$APP" -y "$1" "$2" -o "$WORK/bad.dmg" 2>&1)" && nf=$((nf+1))
+  case "$out" in *"unbound variable"*|*"syntax error"*) nf=$((nf+1)) ;; esac
+done
+[ "$nf" -eq 0 ] && ok "rejects bad numeric options cleanly" || no "bad numeric options ($nf leaked)"
+
+# 13) an option with no value is reported, not left to bash
+if "$BIN" "$APP" -y --volname 2>&1 | grep -q "needs a value"; then ok "reports a missing option value"; else no "missing option value"; fi
+
+# 14) a quote in the volume name does not break the build
+"$BIN" "$APP" -y --volname 'My "Cool" App' -o "$WORK/q.dmg" >/dev/null 2>&1
+M="$(mount_dmg "$WORK/q.dmg")"
+case "$M" in *'My "Cool" App'*) ok "a quoted volume name survives" ;; *) no "quoted volume name ($M)" ;; esac
+hdiutil detach "$M" -quiet 2>/dev/null
 
 echo ""
 echo "==== $pass passed, $fail failed ===="
