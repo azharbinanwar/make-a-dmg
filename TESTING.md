@@ -114,6 +114,19 @@ title bar, so the drawing area was 28 points shorter than requested and every
 background lost its bottom strip. The window is now built 28 points taller to
 compensate.
 
+### The release asset
+
+The published install URL has no version in it:
+
+```sh
+curl -fsSL https://github.com/azharbinanwar/make-a-dmg/releases/latest/download/make-a-dmg | head -1
+```
+
+That must print `#!/usr/bin/env bash`. GitHub resolves `latest` to the newest
+release and serves the asset attached to it, so a release without the script
+attached breaks the install command for everyone. `.github/workflows/release.yml`
+attaches it on every tag; this check confirms it worked.
+
 ### Signing
 
 Needs a Developer ID in your keychain:

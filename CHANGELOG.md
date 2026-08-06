@@ -14,6 +14,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - `-v` as well as `-V` for the version, since it is what most people try first.
 - A bare `make-a-dmg help` shows the help. Without it the word was read as a
   path, and you were told "Not a folder/app: help".
+- Releases now carry the script as an attached asset, so
+  `releases/latest/download/make-a-dmg` always serves the current release. A
+  workflow attaches it on every tag, since doing it by hand is the step that
+  gets forgotten.
 
 ### Fixed
 - `hdiutil attach` is retried. It fails transiently on a loaded machine, and a

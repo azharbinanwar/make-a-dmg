@@ -1,0 +1,34 @@
+name: release
+
+# The install URL is version-free:
+#   https://github.com/azharbinanwar/make-a-dmg/releases/latest/download/make-a-dmg
+# GitHub resolves "latest" to the newest published release and serves the asset
+# attached to it, so every release has to carry the script. Doing that by hand
+# is the step that gets forgotten, which would leave people installing an old
+# version from a URL that claims to be current.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: sanity check the tagged script
+        # a broken script must not reach the "latest" URL
+        run: |
+          bash -n make-a-dmg
+          chmod +x make-a-dmg
+          ./make-a-dmg --version
+
+      - name: attach make-a-dmg to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" make-a-dmg --clobber

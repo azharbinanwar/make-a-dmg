@@ -72,14 +72,17 @@ To remove it later: `brew uninstall make-a-dmg`, or `rm /usr/local/bin/make-a-dm
 <details>
 <summary>Straight from GitHub, or pinned to a version</summary>
 
-`kodeelite.com/dmg` is a redirect to the current release on GitHub. To skip it, or to pin an exact version:
+`kodeelite.com/dmg` is a redirect. To skip it and go to GitHub directly:
 
 ```sh
-# latest on main
-bash <(curl -fsSL https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/main/make-a-dmg)
+# the current release — what the redirect points at
+bash <(curl -fsSL https://github.com/azharbinanwar/make-a-dmg/releases/latest/download/make-a-dmg)
 
-# a specific release
+# a specific release, pinned so the bytes can never change under you
 bash <(curl -fsSL https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/v1.0.0/make-a-dmg)
+
+# the newest commit on main, released or not
+bash <(curl -fsSL https://raw.githubusercontent.com/azharbinanwar/make-a-dmg/main/make-a-dmg)
 ```
 
 And to read it before running it, which is a fair thing to do with any script from the internet:
