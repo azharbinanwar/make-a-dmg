@@ -7,17 +7,16 @@ Turn any macOS app into a polished, drag-to-install `.dmg`. No install, no depen
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 ![dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen.svg)
 
-## Pick one
+## Contents
 
-|                              | 🌐 Run it online                       | 💾 Install it                               |
-| ---------------------------- | -------------------------------------- | ------------------------------------------- |
-| **Command**                  | `bash <(curl -fsSL kodeelite.com/dmg)` | `brew install azharbinanwar/tap/make-a-dmg` |
-| **Puts a file on your Mac?** | No, nothing at all                     | Yes, one script in your PATH                |
-| **Next time you use it**     | Paste the same line again              | Just type `make-a-dmg`                      |
-| **Version you get**          | Always the current release             | `brew upgrade` when you want a newer one    |
-| **Best for**                 | Packaging an app once                  | Using it regularly                          |
-
-Both do exactly the same thing. Pick whichever suits you.
+- [Run it online](#-run-it-online) · [Install it](#-install-it) · [Which one?](#which-one)
+- [How to read the rest of this page](#how-to-read-the-rest-of-this-page)
+- [What you get](#what-you-get) · [The guided wizard](#the-guided-wizard)
+- [Backgrounds and fit modes](#backgrounds-and-fit-modes) — [solid color](#a-solid-color-no-image-needed), [fitting an image](#fitting-an-image), [room at the bottom](#leave-room-at-the-bottom), [retina](#retina)
+- [Options](#options) · [Examples](#examples)
+- [Signing](#signing-optional) · [How it works](#how-it-works)
+- [Troubleshooting](#troubleshooting) · [Requirements](#requirements)
+- [Testing](#testing) · [Contributing](#contributing) · [License](#license)
 
 ---
 
@@ -41,33 +40,56 @@ bash <(curl -fsSL kodeelite.com/dmg) -i
 
 ## 💾 Install it
 
-Puts one script in your PATH, so afterwards you just type `make-a-dmg` from any folder.
+After installing, you just type `make-a-dmg` from any folder.
+
+### With Homebrew
+
+Most people should use this. Check if you have Homebrew:
+
+```sh
+brew --version
+```
+
+If that prints a version, install with:
 
 ```sh
 brew install azharbinanwar/tap/make-a-dmg
 ```
 
-No Homebrew? One line does the same:
+### Without Homebrew
+
+If `brew --version` said *command not found*, use this instead. It downloads the script and makes it runnable:
 
 ```sh
-curl -fsSL kodeelite.com/dmg -o /usr/local/bin/make-a-dmg && chmod +x /usr/local/bin/make-a-dmg
+sudo curl -fsSL kodeelite.com/dmg -o /usr/local/bin/make-a-dmg && sudo chmod +x /usr/local/bin/make-a-dmg
 ```
 
-Then, from anywhere:
+It asks for your Mac password, because `/usr/local/bin` is a system folder.
+
+### Either way
 
 ```sh
 make-a-dmg              # build from the app in this folder
 make-a-dmg -i           # walk through every option
 make-a-dmg MyApp.app    # or name the app
+make-a-dmg --version    # which version you have
 ```
 
-Check which version you have:
+**To remove it:** `brew uninstall make-a-dmg` if you used Homebrew, or `sudo rm /usr/local/bin/make-a-dmg` if you did not.
 
-```sh
-make-a-dmg --version      # make-a-dmg 1.0.0
-```
+**To update it:** `brew upgrade make-a-dmg` if you used Homebrew, or run the download line above again.
 
-To remove it later: `brew uninstall make-a-dmg`, or `rm /usr/local/bin/make-a-dmg` if you installed it by hand.
+---
+
+## Which one?
+
+Both do exactly the same thing, so this is only about convenience.
+
+**Run it online** if you are packaging an app once, or trying it out. Nothing lands on your Mac, and you always get the current release. The cost is that you paste the whole line every time.
+
+**Install it** if you will use it more than once. Afterwards it is just `make-a-dmg` from any folder, and `brew upgrade` when you want a newer version. The cost is one small script living in your PATH.
+
+If you already have Homebrew, install it — there is no downside, and uninstalling is one command.
 
 <details>
 <summary>Straight from GitHub, or pinned to a version</summary>
@@ -97,24 +119,18 @@ curl -fsSL kodeelite.com/dmg | less
 
 ## How to read the rest of this page
 
-Everything below is written as `make-a-dmg …`. That is a stand-in for whichever way you are using it — both accept exactly the same options, in the same order:
+Examples below start with `make-a-dmg`. **If you installed it, type them exactly as written.**
 
-| You are using          | Write this                                     |
-| ---------------------- | ---------------------------------------------- |
-| 🌐 **Run it online**   | `bash <(curl -fsSL kodeelite.com/dmg) …`       |
-| 💾 **Installed**       | `make-a-dmg …`                                 |
-
-So an example written as:
+If you are running it online, replace `make-a-dmg` with `bash <(curl -fsSL kodeelite.com/dmg)` and keep everything after it the same. For example, this:
 
 ```sh
 make-a-dmg MyApp.app --background art/bg.png
 ```
 
-is either of these, depending on which you picked:
+becomes:
 
 ```sh
-bash <(curl -fsSL kodeelite.com/dmg) MyApp.app --background art/bg.png   # online
-make-a-dmg MyApp.app --background art/bg.png                             # installed
+bash <(curl -fsSL kodeelite.com/dmg) MyApp.app --background art/bg.png
 ```
 
 ---
@@ -333,10 +349,28 @@ xcrun stapler staple MyApp-1.0.0.dmg
 
 Everything is done with tools that ship with macOS: `hdiutil` builds and compresses the disk image, `osascript` (Finder) lays out the window, and `sips` + `iconutil` prepare the icon and fit the background. An `/Applications` symlink is the drag target. The image work happens before the disk image is assembled, and the layout step verifies Finder actually saved the window and retries if it did not.
 
-```
-your.app ─┐
-          ├─► staging folder ─► hdiutil create ─► mount ─► Finder lays out ─► detach ─► compress ─► sign ─► .dmg
-bg / icon ─┘                     (read-write)              window + icons              (UDZO)   (optional)
+```mermaid
+flowchart TD
+    APP["📦 your .app"] --> STAGE
+    BG["🖼 background<br/><i>image or colour</i>"] --> STAGE
+    ICON["🎨 icon"] --> STAGE
+
+    STAGE["staging folder<br/><i>+ Applications symlink</i>"] --> CREATE
+    CREATE["hdiutil create<br/><i>read-write disk image</i>"] --> MOUNT
+    MOUNT["mount"] --> LAYOUT
+    LAYOUT["Finder lays it out<br/><i>window size · icon spots · background</i>"] --> DETACH
+    DETACH["detach"] --> ZIP
+    ZIP["compress<br/><i>UDZO</i>"] --> SIGN
+    SIGN["sign<br/><i>only with --sign</i>"] --> OUT
+
+    OUT["💿 your .dmg"]
+
+    style APP fill:#2d6cdf,stroke:#1b4ea8,color:#fff
+    style BG fill:#2d6cdf,stroke:#1b4ea8,color:#fff
+    style ICON fill:#2d6cdf,stroke:#1b4ea8,color:#fff
+    style LAYOUT fill:#b8860b,stroke:#8a6508,color:#fff
+    style SIGN fill:#5a5a5a,stroke:#3d3d3d,color:#fff
+    style OUT fill:#1e9e5a,stroke:#14733f,color:#fff
 ```
 
 The window layout is a **snapshot**, not code. Finder saves it into a hidden `.DS_Store` inside the image, and replays it when someone else mounts the dmg. Nothing of ours runs on their Mac, so the layout cannot adapt to their screen or their Finder settings — which is why backgrounds want some breathing room at the edges.
