@@ -1,34 +1,101 @@
 name: release
 
-# The install URL is version-free:
-#   https://github.com/azharbinanwar/make-a-dmg/releases/latest/download/make-a-dmg
-# GitHub resolves "latest" to the newest published release and serves the asset
-# attached to it, so every release has to carry the script. Doing that by hand
-# is the step that gets forgotten, which would leave people installing an old
-# version from a URL that claims to be current.
+# Releases are driven by one line in the script:
+#
+#     VERSION="1.0.1"      make-a-dmg, line 23
+#
+# Change it, push to main, and this tags, releases, attaches the script and
+# bumps the Homebrew formula. Deriving the tag from the file means the two can
+# never disagree, so nobody installs "1.0.1" and is told it is 1.0.0.
+#
+# Ordinary commits are ignored: if the tag for the current VERSION already
+# exists, the job stops before changing anything.
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  attach:
-    runs-on: ubuntu-latest
+  release:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # tags, so we can tell whether this version shipped
 
-      - name: sanity check the tagged script
-        # a broken script must not reach the "latest" URL
+      - name: read VERSION and decide whether to release
+        id: check
         run: |
-          bash -n make-a-dmg
-          chmod +x make-a-dmg
-          ./make-a-dmg --version
+          version="$(sed -n 's/^VERSION="\(.*\)"$/\1/p' make-a-dmg)"
+          [ -n "$version" ] || { echo "::error::no VERSION= line in make-a-dmg"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already tagged, nothing to release"
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: attach make-a-dmg to the release
+      # A stray keystroke on line 23 should not publish a release. Requiring a
+      # matching changelog section makes the bump deliberate, and gives us the
+      # release notes for free.
+      - name: changelog must describe this version
+        if: steps.check.outputs.fresh == 'true'
+        run: |
+          v='${{ steps.check.outputs.version }}'
+          grep -q "^## \[$v\]" CHANGELOG.md || {
+            echo "::error::CHANGELOG.md has no '## [$v]' section. Add one, or revert VERSION."; exit 1; }
+
+      - name: shellcheck
+        if: steps.check.outputs.fresh == 'true'
+        run: |
+          brew install --quiet shellcheck
+          shellcheck --severity=warning make-a-dmg test.sh
+
+      # Everything below publishes. Nothing reaches users until these pass.
+      - name: full test suite
+        if: steps.check.outputs.fresh == 'true'
+        run: ./test.sh --full
+
+      - name: tag and release
+        if: steps.check.outputs.fresh == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" make-a-dmg --clobber
+        run: |
+          v='${{ steps.check.outputs.version }}'
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$v" -m "make-a-dmg v$v"
+          git push origin "v$v"
+          # notes = this version's changelog section, minus its own heading
+          awk -v v="$v" '
+            $0 == "## [" v "]" || index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > /tmp/notes.md
+          gh release create "v$v" --title "v$v" --notes-file /tmp/notes.md --verify-tag
+          gh release upload "v$v" make-a-dmg --clobber
+
+      # The install URL has no version in it, so the formula is the only place a
+      # version still has to be written down.
+      - name: bump the Homebrew formula
+        if: steps.check.outputs.fresh == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          v='${{ steps.check.outputs.version }}'
+          url="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
+          sha="$(curl -fsSL "$url" | shasum -a 256 | cut -d' ' -f1)"
+          git clone -q "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository_owner }}/homebrew-tap.git" tap
+          cd tap
+          sed -i '' -e "s|^  url .*|  url \"$url\"|" \
+                    -e "s|^  sha256 .*|  sha256 \"$sha\"|" Formula/make-a-dmg.rb
+          git diff --quiet && { echo "formula already current"; exit 0; }
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "make-a-dmg $v"
+          git push -q origin HEAD

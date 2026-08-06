@@ -67,6 +67,44 @@ shellcheck make-a-dmg test.sh
   release pipeline, not in a packaging script. The README shows the two commands.
 - Speculative options nobody has asked for
 
+## Releasing
+
+One line drives it. In `make-a-dmg`:
+
+```bash
+VERSION="1.0.1"
+```
+
+Change that, add a matching `## [1.0.1]` section to `CHANGELOG.md`, commit, push
+to `main`. That is the whole release.
+
+`.github/workflows/release.yml` then, in order:
+
+1. Reads `VERSION`. If `v1.0.1` is already tagged it stops — ordinary commits do
+   not re-release.
+2. Refuses to continue unless `CHANGELOG.md` has a `## [1.0.1]` section, so a
+   stray keystroke on that line cannot publish anything.
+3. Runs `shellcheck` and `./test.sh --full`. Nothing is published if either fails.
+4. Tags `v1.0.1`, creates the release with that changelog section as the notes,
+   and attaches `make-a-dmg` to it.
+5. Updates `url` and `sha256` in `Formula/make-a-dmg.rb` in the `homebrew-tap`
+   repo, so `brew upgrade` works.
+
+Deriving the tag from the file is deliberate: the two can never drift, so nobody
+installs "1.0.1" and is told by `--version` that it is 1.0.0.
+
+The published install URL carries no version:
+
+```
+https://github.com/azharbinanwar/make-a-dmg/releases/latest/download/make-a-dmg
+```
+
+GitHub resolves `latest` itself, which is why `kodeelite.com/dmg` never needs
+changing when a release ships.
+
+The tap bump needs a `TAP_TOKEN` secret on this repo — a fine-grained token with
+Contents read/write on `homebrew-tap`. Everything else uses the automatic token.
+
 ## Reporting a bug
 
 Include your macOS version, the exact command you ran, and the full output. If
