@@ -7,6 +7,8 @@ Turn any macOS app into a polished, drag-to-install `.dmg`. No install, no depen
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 ![dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen.svg)
 
+![make-a-dmg building three different disk images](assets/demo.svg)
+
 ## Contents
 
 - [Run it online](#-run-it-online) · [Install it](#-install-it) · [Which one?](#which-one)
