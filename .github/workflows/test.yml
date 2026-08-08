@@ -1,9 +1,14 @@
 name: test
 
+# Documentation cannot break the tool, and the suite builds eight real disk
+# images, so prose-only pushes skip it. Anything that can affect behaviour --
+# the script, the tests, the workflows themselves -- still runs everything.
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'assets/**', 'docs/**', 'LICENSE']
   pull_request:
+    paths-ignore: ['**.md', 'assets/**', 'docs/**', 'LICENSE']
   workflow_dispatch:
 
 jobs:
